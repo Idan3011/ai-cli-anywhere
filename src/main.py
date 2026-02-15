@@ -7,6 +7,7 @@ from src.config import Config
 from src.constants import MSG_BOT_STARTING
 from src.router import MessageRouter
 from src.telegram.client import TelegramClient
+from src.transcription.whisper import WhisperTranscriptionClient
 
 
 def _setup_logging(level: str) -> None:
@@ -24,7 +25,12 @@ def main() -> None:
     logger.info(MSG_BOT_STARTING)
 
     router = MessageRouter(config)
-    client = TelegramClient(config)
+    transcriber = (
+        WhisperTranscriptionClient(config.openai_api_key)
+        if config.openai_api_key
+        else None
+    )
+    client = TelegramClient(config, transcriber=transcriber)
     client.run(router.handle, on_model=router.handle_model_command)
 
 
