@@ -8,6 +8,7 @@ from src.constants import MSG_BOT_STARTING
 from src.router import MessageRouter
 from src.telegram.client import TelegramClient
 from src.transcription.whisper import WhisperTranscriptionClient
+from src.vision.claude import ClaudeVisionClient
 
 
 def _setup_logging(level: str) -> None:
@@ -30,8 +31,18 @@ def main() -> None:
         if config.openai_api_key
         else None
     )
-    client = TelegramClient(config, transcriber=transcriber)
-    client.run(router.handle, on_model=router.handle_model_command)
+    vision = (
+        ClaudeVisionClient(config.anthropic_api_key)
+        if config.anthropic_api_key
+        else None
+    )
+    client = TelegramClient(config, transcriber=transcriber, vision_client=vision)
+    client.run(
+        router.handle,
+        on_model=router.handle_model_command,
+        on_status=router.handle_status_command,
+        on_new=router.handle_new_command,
+    )
 
 
 if __name__ == "__main__":
