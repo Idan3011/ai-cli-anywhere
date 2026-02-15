@@ -1,5 +1,7 @@
 # ai-cli-anywhere
 
+![CI](https://github.com/Idan3011/ai-cli-anywhere/actions/workflows/ci.yml/badge.svg)
+
 Use your Claude CLI and Cursor Agent from your phone via Telegram.
 
 Built this for myself — tired of being away from my desk and not being able to continue a session with my AI tools. No cloud API, no walled garden. The AI runs on your machine (or a free cloud VM), with access to your actual projects.
@@ -7,10 +9,11 @@ Built this for myself — tired of being away from my desk and not being able to
 ## How it works
 
 ```
-Your Telegram message
+Your Telegram message (text or voice)
         ↓
 Telegram Bot API  (official, event-driven)
         ↓
+  voice note?  → transcribed to text automatically
   @claude tag? → Claude CLI (your installation, your projects)
   /model ...   → switch AI model
   everything else → Cursor Agent
@@ -67,4 +70,4 @@ CLAUDE_MODEL_ALIASES=opus:claude-opus-4-6,sonnet:claude-sonnet-4-5-20250929,haik
 
 ## License
 
-Copyright (c) 2026. All Rights Reserved. See [LICENSE](./LICENSE).
+MIT — see [LICENSE](./LICENSE).
