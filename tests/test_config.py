@@ -49,6 +49,7 @@ def test_config_immutable():
         claude_patterns=("@claude",),
         claude_model_aliases={},
         cursor_working_dir=None,
+        openai_api_key=None,
     )
 
     with pytest.raises(Exception):
@@ -147,3 +148,25 @@ def test_config_cursor_working_dir_default_is_none(monkeypatch):
     config = Config.from_env()
 
     assert config.cursor_working_dir is None
+
+
+def test_config_openai_api_key_from_env(monkeypatch):
+    """OPENAI_API_KEY is read from env."""
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot:tok")
+    monkeypatch.setenv("ALLOWED_CHAT_ID", "123456789")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test123")
+
+    config = Config.from_env()
+
+    assert config.openai_api_key == "sk-test123"
+
+
+def test_config_openai_api_key_default_is_none(monkeypatch):
+    """OPENAI_API_KEY defaults to None (voice transcription disabled)."""
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot:tok")
+    monkeypatch.setenv("ALLOWED_CHAT_ID", "123456789")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    config = Config.from_env()
+
+    assert config.openai_api_key is None
