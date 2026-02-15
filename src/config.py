@@ -18,6 +18,7 @@ class Config:
     claude_patterns: tuple[str, ...]
     claude_model_aliases: dict[str, str]
     cursor_working_dir: Optional[str]
+    openai_api_key: Optional[str]
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -33,6 +34,7 @@ class Config:
         raw_patterns = os.getenv("CLAUDE_PATTERNS", "@claude,claude:,hey claude,claude,")
         raw_aliases = os.getenv("CLAUDE_MODEL_ALIASES", DEFAULT_CLAUDE_MODEL_ALIASES)
         cursor_working_dir = os.getenv("CURSOR_WORKING_DIR") or None
+        openai_api_key = os.getenv("OPENAI_API_KEY") or None
 
         patterns = tuple(p.strip() for p in raw_patterns.split(",") if p.strip())
         aliases = dict(
@@ -52,6 +54,7 @@ class Config:
             claude_patterns=patterns,
             claude_model_aliases=aliases,
             cursor_working_dir=cursor_working_dir,
+            openai_api_key=openai_api_key,
         )
 
     @staticmethod
@@ -66,6 +69,7 @@ class Config:
         claude_patterns: tuple[str, ...],
         claude_model_aliases: dict[str, str],
         cursor_working_dir: Optional[str],
+        openai_api_key: Optional[str],
     ) -> "Config":
         match telegram_bot_token:
             case None | "":
@@ -90,4 +94,5 @@ class Config:
             claude_patterns=claude_patterns,
             claude_model_aliases=claude_model_aliases,
             cursor_working_dir=cursor_working_dir,
+            openai_api_key=openai_api_key,
         )
