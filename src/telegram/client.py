@@ -18,19 +18,26 @@ from src.constants import (
     MSG_NO_RESPONSE,
     MSG_SEND_FAIL,
     MSG_SEND_OK,
+    MSG_VOICE_TRANSCRIPTION_FAILED,
 )
 from src.message_handler import ChatMessage, normalize_phone
 from src.telegram.typing import TelegramTypingIndicator
+from src.transcription.client import TranscriptionClient
 
 logger = logging.getLogger(__name__)
 
 
 class TelegramClient(BotClient):
 
-    def __init__(self, config: Config) -> None:
+    def __init__(
+        self,
+        config: Config,
+        transcriber: Optional[TranscriptionClient] = None,
+    ) -> None:
         self._token = config.telegram_bot_token
         self._allowed_chat_id = config.allowed_chat_id
         self._app: Optional[Application] = None
+        self._transcriber = transcriber
 
     # ── BotClient interface ───────────────────────────────────────────────────
 
@@ -48,6 +55,10 @@ class TelegramClient(BotClient):
                 CommandHandler(CMD_MODEL, self._make_model_handler(on_model))
             )
         self._app.add_handler(CommandHandler("help", self._make_help_handler()))
+        if self._transcriber is not None:
+            self._app.add_handler(
+                TGMessageHandler(filters.VOICE, self._make_voice_handler(on_message))
+            )
         self._app.run_polling()
 
     async def send_message(self, to: str, text: str) -> bool:
@@ -108,6 +119,41 @@ class TelegramClient(BotClient):
                     pass
             sender = str(update.effective_chat.id) if update.effective_chat else ""
             await self.send_message(sender, MSG_HELP)
+
+        return _handler
+
+    def _make_voice_handler(
+        self, on_message: Callable[[ChatMessage], Awaitable[str]]
+    ) -> Callable:
+        async def _handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+            match self._is_allowed(update):
+                case False:
+                    chat_id = update.effective_chat.id if update.effective_chat else "?"
+                    logger.warning(MSG_BLOCKED_CHAT, chat_id)
+                    return
+                case True:
+                    pass
+
+            sender = str(update.effective_chat.id) if update.effective_chat else ""
+            voice = update.message.voice if update.message else None
+            match voice:
+                case None:
+                    return
+                case v:
+                    try:
+                        tg_file = await v.get_file()
+                        audio_bytes = bytes(await tg_file.download_as_bytearray())
+                        text = await self._transcriber.transcribe(audio_bytes)
+                    except Exception:
+                        logger.exception("Voice transcription failed")
+                        await self.send_message(sender, MSG_VOICE_TRANSCRIPTION_FAILED)
+                        return
+                    msg = ChatMessage(
+                        sender=sender,
+                        content=text,
+                        timestamp=int(update.message.date.timestamp()),
+                    )
+                    await self._process(msg, context.bot, on_message)
 
         return _handler
 
