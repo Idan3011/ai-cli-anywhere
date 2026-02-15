@@ -38,6 +38,13 @@ MSG_ERR_NO_CURSOR_RESPONSE = "Error: No response from Cursor Agent"
 WHISPER_MODEL = "whisper-1"
 VOICE_FILENAME = "voice.ogg"
 MSG_VOICE_TRANSCRIPTION_FAILED = "Could not transcribe voice message — please try again"
+MSG_VOICE_NOT_CONFIGURED = "Voice messages are not supported in this setup."
+
+# Image analysis
+CLAUDE_VISION_MODEL = "claude-opus-4-6"
+MSG_IMAGE_DEFAULT_PROMPT = "What do you see in this image? Describe it in detail."
+MSG_IMAGE_ANALYSIS_FAILED = "Could not analyze image — please try again."
+MSG_IMAGE_NOT_CONFIGURED = "Image analysis is not supported in this setup."
 
 # /model command
 CMD_MODEL = "model"
@@ -57,13 +64,29 @@ MSG_MODEL_USAGE = (
 MSG_MODEL_SET_CLAUDE = "Claude model set to: %s"
 MSG_MODEL_STATUS = "Current models:\n• Claude: %s\n• Cursor: (use /model cursor <name>)"
 
+CMD_STATUS = "status"
+MSG_STATUS = (
+    "Status\n"
+    "  Claude model : %s\n"
+    "  Voice        : %s\n"
+    "  Cursor       : %s\n"
+)
+
+CMD_NEW = "new"
+MSG_NEW_SESSION = "Session cleared — starting fresh."
+
 MSG_HELP = (
     "ai-cli-anywhere — your dev tools on Telegram\n"
     "\n"
     "Commands:\n"
     "  /help                    — show this message\n"
+    "  /status                  — current config at a glance\n"
     "  /model claude <alias>    — switch Claude model\n"
     "  /model cursor <name>     — switch Cursor model\n"
+    "  /new                     — start a fresh Claude session\n"
+    "\n"
+    "Voice:\n"
+    "  Send a voice note        — transcribed and routed automatically\n"
     "\n"
     "Model aliases (update in .env):\n"
     "  opus   → claude-opus-4-6\n"

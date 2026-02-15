@@ -19,6 +19,7 @@ def make_config(*, token: str = "test-token", chat_id: str = "123456789") -> Con
         claude_model_aliases={},
         cursor_working_dir=None,
         openai_api_key=None,
+        anthropic_api_key=None,
     )
 
 
@@ -118,10 +119,31 @@ def test_parse_model_args_provider_only_returns_none():
 # ── voice transcription ───────────────────────────────────────────────────────
 
 
-def test_voice_not_transcribed_when_no_transcriber():
-    """Without a transcriber, voice handler is not registered — no error."""
+def test_voice_transcriber_is_none_by_default():
+    """Without a transcriber, _transcriber is None."""
     client = TelegramClient(make_config())
     assert client._transcriber is None
+
+
+async def test_voice_replies_not_configured_when_no_transcriber():
+    """Voice handler sends MSG_VOICE_NOT_CONFIGURED when transcriber is None."""
+    from unittest.mock import AsyncMock, patch
+    from src.constants import MSG_VOICE_NOT_CONFIGURED
+
+    client = TelegramClient(make_config())
+    on_message = AsyncMock()
+
+    update = MagicMock()
+    update.effective_chat.id = 123456789
+    update.message.voice = MagicMock()
+    update.message.date.timestamp.return_value = 1000.0
+    context = MagicMock()
+
+    with patch.object(client, "send_message", new_callable=AsyncMock) as mock_send:
+        handler = client._make_voice_handler(on_message)
+        await handler(update, context)
+        mock_send.assert_called_once_with("123456789", MSG_VOICE_NOT_CONFIGURED)
+    on_message.assert_not_called()
 
 
 def test_voice_transcriber_stored_on_client():

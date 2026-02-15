@@ -50,6 +50,7 @@ def test_config_immutable():
         claude_model_aliases={},
         cursor_working_dir=None,
         openai_api_key=None,
+        anthropic_api_key=None,
     )
 
     with pytest.raises(Exception):
@@ -166,6 +167,7 @@ def test_config_openai_api_key_default_is_none(monkeypatch):
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "bot:tok")
     monkeypatch.setenv("ALLOWED_CHAT_ID", "123456789")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr("src.config.load_dotenv", lambda **_: None)
 
     config = Config.from_env()
 
