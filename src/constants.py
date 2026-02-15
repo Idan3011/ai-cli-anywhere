@@ -34,6 +34,11 @@ MSG_ERR_TIMEOUT = "Error: Request timed out — try again"
 MSG_ERR_NO_CURSOR = "Error: Cursor CLI path not configured"
 MSG_ERR_NO_CURSOR_RESPONSE = "Error: No response from Cursor Agent"
 
+# Voice transcription
+WHISPER_MODEL = "whisper-1"
+VOICE_FILENAME = "voice.ogg"
+MSG_VOICE_TRANSCRIPTION_FAILED = "Could not transcribe voice message — please try again"
+
 # /model command
 CMD_MODEL = "model"
 DEFAULT_CLAUDE_MODEL_ALIASES = (
