@@ -1,0 +1,72 @@
+"""All magic values live here — no inline literals anywhere else."""
+
+# Telegram typing indicator re-send interval (seconds).
+# The TYPING action expires after ~5 s, so we refresh every 4 s.
+TELEGRAM_TYPING_INTERVAL: float = 4.0
+
+# Claude CLI flags
+CLAUDE_OUTPUT_FORMAT = "json"
+CLAUDE_RESUME_FLAG = "--resume"
+CLAUDE_OUTPUT_FLAG = "--output-format"
+CLAUDE_PROMPT_FLAG = "-p"
+CLAUDE_MODEL_FLAG = "--model"
+
+# Cursor CLI flags
+CURSOR_CREATE_CHAT = "create-chat"
+CURSOR_RESUME_FLAG = "--resume"
+CURSOR_PROMPT_FLAG = "-p"
+CURSOR_TRUST_FLAG = "--trust"
+
+# Log / user-facing messages
+MSG_BOT_STARTING = "Starting Telegram bot…"
+MSG_CONNECTED = "Telegram bot connected"
+MSG_BLOCKED_CHAT = "Blocked update from chat_id: %s"
+MSG_NO_RESPONSE = "No response generated"
+MSG_SEND_OK = "✓ Sent (%.1fs)"
+MSG_SEND_FAIL = "✗ Send failed (%.1fs)"
+MSG_CURSOR_TIMEOUT = "Cursor Agent timeout (%ss)"
+MSG_CLAUDE_TIMEOUT = "Claude CLI timeout"
+MSG_ROUTING_CLAUDE = "→ Claude CLI"
+MSG_ROUTING_CURSOR = "→ Cursor Agent"
+
+# Router error replies
+MSG_ERR_TIMEOUT = "Error: Request timed out — try again"
+MSG_ERR_NO_CURSOR = "Error: Cursor CLI path not configured"
+MSG_ERR_NO_CURSOR_RESPONSE = "Error: No response from Cursor Agent"
+
+# /model command
+CMD_MODEL = "model"
+DEFAULT_CLAUDE_MODEL_ALIASES = (
+    "opus:claude-opus-4-6,"
+    "sonnet:claude-sonnet-4-5-20250929,"
+    "haiku:claude-haiku-4-5-20251001"
+)
+MSG_MODEL_USAGE = (
+    "Usage:\n"
+    "  /model claude <model-id>  — switch Claude model\n"
+    "  /model cursor <name>      — switch Cursor model\n\n"
+    "Examples:\n"
+    "  /model claude claude-opus-4-6\n"
+    "  /model cursor sonnet 4.5"
+)
+MSG_MODEL_SET_CLAUDE = "Claude model set to: %s"
+MSG_MODEL_STATUS = "Current models:\n• Claude: %s\n• Cursor: (use /model cursor <name>)"
+
+MSG_HELP = (
+    "ai-cli-anywhere — your dev tools on Telegram\n"
+    "\n"
+    "Commands:\n"
+    "  /help                    — show this message\n"
+    "  /model claude <alias>    — switch Claude model\n"
+    "  /model cursor <name>     — switch Cursor model\n"
+    "\n"
+    "Model aliases (update in .env):\n"
+    "  opus   → claude-opus-4-6\n"
+    "  sonnet → claude-sonnet-4-5-20250929\n"
+    "  haiku  → claude-haiku-4-5-20251001\n"
+    "\n"
+    "Routing:\n"
+    "  @claude / claude: / hey claude → Claude CLI\n"
+    "  everything else                → Cursor Agent\n"
+)
+
