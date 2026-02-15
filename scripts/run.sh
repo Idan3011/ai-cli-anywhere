@@ -1,8 +1,10 @@
 #!/bin/bash
 set -e
 
-[ ! -f ".env" ] && echo "Error: .env not found!" && exit 1
+cd "$(dirname "$0")/.."
 
-source venv/bin/activate
+[ ! -f ".env" ] && echo "Error: .env not found — copy .env.example and fill in your values." && exit 1
+[ ! -d ".venv" ] && echo "Error: .venv not found — run: bash scripts/install.sh" && exit 1
+
 export PYTHONPATH="${PWD}:${PYTHONPATH}"
-python3 -m src.main
+exec .venv/bin/python -m src.main
