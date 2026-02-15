@@ -18,6 +18,7 @@ def make_config(*, token: str = "test-token", chat_id: str = "123456789") -> Con
         claude_patterns=("@claude",),
         claude_model_aliases={},
         cursor_working_dir=None,
+        openai_api_key=None,
     )
 
 
@@ -112,6 +113,24 @@ def test_parse_model_args_empty_returns_none():
 def test_parse_model_args_provider_only_returns_none():
     result = TelegramClient._parse_model_args("claude")
     assert result is None
+
+
+# ── voice transcription ───────────────────────────────────────────────────────
+
+
+def test_voice_not_transcribed_when_no_transcriber():
+    """Without a transcriber, voice handler is not registered — no error."""
+    client = TelegramClient(make_config())
+    assert client._transcriber is None
+
+
+def test_voice_transcriber_stored_on_client():
+    from src.transcription.client import TranscriptionClient
+    from unittest.mock import MagicMock
+
+    transcriber = MagicMock(spec=TranscriptionClient)
+    client = TelegramClient(make_config(), transcriber=transcriber)
+    assert client._transcriber is transcriber
 
 
 # ── /help command ─────────────────────────────────────────────────────────────
