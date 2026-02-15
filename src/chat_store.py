@@ -52,6 +52,13 @@ class ChatStore:
         self._store[sender] = value
         self._save()
 
+    def delete(self, sender: str) -> None:
+        match self._store.pop(sender, None):
+            case None:
+                pass
+            case _:
+                self._save()
+
 
 class ClaudeSessionStore(ChatStore):
 

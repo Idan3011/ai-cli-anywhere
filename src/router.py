@@ -23,8 +23,10 @@ from src.constants import (
     MSG_ERR_TIMEOUT,
     MSG_MODEL_SET_CLAUDE,
     MSG_MODEL_USAGE,
+    MSG_NEW_SESSION,
     MSG_ROUTING_CLAUDE,
     MSG_ROUTING_CURSOR,
+    MSG_STATUS,
 )
 from src.message_handler import ChatMessage, normalize_phone
 
@@ -86,6 +88,18 @@ class MessageRouter:
                 return await self._call_cursor_cli(sender, "/model " + args.strip())
             case _:
                 return MSG_MODEL_USAGE
+
+    def handle_status_command(self) -> str:
+        model = self._claude_model or "default"
+        voice = "enabled" if self._config.openai_api_key else "disabled"
+        cursor = self._config.cursor_cli_path or "not configured"
+        return MSG_STATUS % (model, voice, cursor)
+
+    def handle_new_command(self, sender: str) -> str:
+        key = normalize_phone(sender)
+        self._claude_store.delete(key)
+        self._chat_store.delete(key)
+        return MSG_NEW_SESSION
 
     async def handle(self, message: ChatMessage, **_) -> str:
         use_claude = (

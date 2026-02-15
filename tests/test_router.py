@@ -232,3 +232,50 @@ async def test_call_claude_cli_passes_model_flag_when_set(monkeypatch):
     assert "--model" in captured_args
     idx = captured_args.index("--model")
     assert captured_args[idx + 1] == "claude-opus-4-6"
+
+
+# ── /status command ───────────────────────────────────────────────────────────
+
+
+def test_status_shows_default_model(monkeypatch):
+    router = MessageRouter(make_config(monkeypatch))
+    assert "default" in router.handle_status_command()
+
+
+def test_status_shows_set_model(monkeypatch):
+    router = MessageRouter(make_config(monkeypatch))
+    router.set_claude_model("claude-opus-4-6")
+    assert "claude-opus-4-6" in router.handle_status_command()
+
+
+def test_status_shows_voice_disabled_when_no_key(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr("src.config.load_dotenv", lambda **_: None)
+    router = MessageRouter(make_config(monkeypatch))
+    assert "disabled" in router.handle_status_command()
+
+
+def test_status_shows_cursor_not_configured(monkeypatch):
+    router = MessageRouter(make_config(monkeypatch, cursor_cli=""))
+    assert "not configured" in router.handle_status_command()
+
+
+# ── /new command ──────────────────────────────────────────────────────────────
+
+
+def test_new_clears_session_and_returns_confirmation(monkeypatch):
+    from src.constants import MSG_NEW_SESSION
+    router = MessageRouter(make_config(monkeypatch))
+    router._claude_store.set("123456789", "session-abc")
+    router._chat_store.set("123456789", "chat-xyz")
+    result = router.handle_new_command("123456789")
+    assert result == MSG_NEW_SESSION
+    assert router._claude_store.get("123456789") is None
+    assert router._chat_store.get("123456789") is None
+
+
+def test_new_on_empty_session_still_returns_confirmation(monkeypatch):
+    from src.constants import MSG_NEW_SESSION
+    router = MessageRouter(make_config(monkeypatch))
+    result = router.handle_new_command("123456789")
+    assert result == MSG_NEW_SESSION
