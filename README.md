@@ -13,15 +13,17 @@ Your Telegram message
         ↓
 Telegram Bot API  (official, event-driven)
         ↓
-  voice note?  → transcribed via Whisper → text
+  voice note?  → transcribed via Whisper (OpenAI) → text
   photo?       → analyzed via Claude Vision → text
   @claude tag? → Claude CLI (your installation, your projects)
-  /model ...   → switch AI model on the fly
-  /status      → see current config
-  /new         → fresh session
   everything else → Cursor Agent
         ↓
-Reply back to Telegram
+  /model ...   → switch AI model on the fly
+  /status      → see current config
+  /new         → start a fresh session
+  /history     → show last exchanges
+        ↓
+Reply back to Telegram  (streamed live if STREAM_RESPONSES=true)
 ```
 
 Conversation memory is persistent across sessions. The bot knows what you talked about yesterday.
@@ -37,6 +39,21 @@ bash scripts/install.sh
 The script walks you through everything — Telegram bot creation, config, and optionally setting up a systemd service so it runs on startup.
 
 Full guide: [docs/INSTALL.md](./docs/INSTALL.md)
+
+## Deployment
+
+**systemd** (recommended for a Linux server):
+```bash
+cp deploy/ai-cli-anywhere.service /etc/systemd/system/ai-cli-anywhere@.service
+systemctl enable --now ai-cli-anywhere@$USER
+```
+
+**Docker Compose**:
+```bash
+docker compose up -d
+```
+
+See [`deploy/README.md`](./deploy/README.md) for full instructions.
 
 ## Running 24/7 without your laptop
 
@@ -65,6 +82,8 @@ CLAUDE_MODEL_ALIASES=opus:claude-opus-4-6,sonnet:claude-sonnet-4-5-20250929,haik
 - Claude CLI ([install](https://claude.ai/code))
 - Cursor Agent (optional — leave blank to use Claude for everything)
 - A Telegram bot token ([@BotFather](https://t.me/BotFather), free, 2 min)
+- OpenAI API key (optional — enables voice transcription via Whisper)
+- Anthropic API key (optional — enables image analysis via Claude Vision)
 
 ## Docs
 
