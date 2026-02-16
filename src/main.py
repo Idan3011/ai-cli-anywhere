@@ -42,6 +42,8 @@ def main() -> None:
         on_model=router.handle_model_command,
         on_status=router.handle_status_command,
         on_new=router.handle_new_command,
+        on_history=router.handle_history_command,
+        stream_handle=router.stream_handle if config.stream_responses else None,
     )
 
 

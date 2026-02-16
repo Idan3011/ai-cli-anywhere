@@ -11,6 +11,8 @@ from telegram.ext import filters
 from src.bot_client import BotClient, OnModel
 from src.config import Config
 from src.constants import (
+    ALBUM_DEBOUNCE_SECONDS,
+    CMD_HISTORY,
     CMD_MODEL,
     CMD_NEW,
     CMD_STATUS,
@@ -22,8 +24,10 @@ from src.constants import (
     MSG_NO_RESPONSE,
     MSG_SEND_FAIL,
     MSG_SEND_OK,
+    MSG_STREAM_PLACEHOLDER,
     MSG_VOICE_NOT_CONFIGURED,
     MSG_VOICE_TRANSCRIPTION_FAILED,
+    STREAM_EDIT_INTERVAL,
 )
 from src.message_handler import ChatMessage, normalize_phone
 from src.telegram.typing import TelegramTypingIndicator
@@ -46,6 +50,8 @@ class TelegramClient(BotClient):
         self._app: Optional[Application] = None
         self._transcriber = transcriber
         self._vision_client = vision_client
+        # album debounce: media_group_id → (best_photo, caption, sender, date, task)
+        self._pending_albums: dict[str, dict] = {}
 
     # ── BotClient interface ───────────────────────────────────────────────────
 
@@ -55,7 +61,10 @@ class TelegramClient(BotClient):
         on_model: OnModel | None = None,
         on_status: Callable[[], str] | None = None,
         on_new: Callable[[str], str] | None = None,
+        on_history: Callable[[str], str] | None = None,
+        stream_handle: Callable | None = None,
     ) -> None:
+        self._stream_handle = stream_handle
         self._app = Application.builder().token(self._token).build()
         self._app.add_handler(
             TGMessageHandler(filters.TEXT & ~filters.COMMAND, self._make_handler(on_message))
@@ -71,6 +80,10 @@ class TelegramClient(BotClient):
         if on_new is not None:
             self._app.add_handler(
                 CommandHandler(CMD_NEW, self._make_sender_handler(on_new))
+            )
+        if on_history is not None:
+            self._app.add_handler(
+                CommandHandler(CMD_HISTORY, self._make_sender_handler(on_history))
             )
         self._app.add_handler(CommandHandler("help", self._make_help_handler()))
         self._app.add_handler(
@@ -192,14 +205,18 @@ class TelegramClient(BotClient):
                 case None:
                     return
                 case v:
+                    typing = TelegramTypingIndicator(context.bot, sender)
+                    await typing.start(sender)
                     try:
                         tg_file = await v.get_file()
                         audio_bytes = bytes(await tg_file.download_as_bytearray())
                         text = await self._transcriber.transcribe(audio_bytes)
                     except Exception:
+                        await typing.stop(sender)
                         logger.exception("Voice transcription failed")
                         await self.send_message(sender, MSG_VOICE_TRANSCRIPTION_FAILED)
                         return
+                    await typing.stop(sender)
                     msg = ChatMessage(
                         sender=sender,
                         content=text,
@@ -212,6 +229,28 @@ class TelegramClient(BotClient):
     def _make_photo_handler(
         self, on_message: Callable[[ChatMessage], Awaitable[str]]
     ) -> Callable:
+        async def _process_photo(
+            sender: str,
+            best_photo: object,
+            caption: Optional[str],
+            timestamp: int,
+            bot: Bot,
+        ) -> None:
+            typing = TelegramTypingIndicator(bot, sender)
+            await typing.start(sender)
+            try:
+                tg_file = await best_photo.get_file()
+                image_bytes = bytes(await tg_file.download_as_bytearray())
+                text = await self._vision_client.analyze(image_bytes, caption)
+            except Exception:
+                await typing.stop(sender)
+                logger.exception("Image analysis failed")
+                await self.send_message(sender, MSG_IMAGE_ANALYSIS_FAILED)
+                return
+            await typing.stop(sender)
+            msg = ChatMessage(sender=sender, content=text, timestamp=timestamp)
+            await self._process(msg, bot, on_message)
+
         async def _handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             match self._is_allowed(update):
                 case False:
@@ -234,21 +273,44 @@ class TelegramClient(BotClient):
                 case None | []:
                     return
                 case _:
-                    try:
-                        tg_file = await photos[-1].get_file()
-                        image_bytes = bytes(await tg_file.download_as_bytearray())
-                        caption = update.message.caption if update.message else None
-                        text = await self._vision_client.analyze(image_bytes, caption)
-                    except Exception:
-                        logger.exception("Image analysis failed")
-                        await self.send_message(sender, MSG_IMAGE_ANALYSIS_FAILED)
-                        return
-                    msg = ChatMessage(
-                        sender=sender,
-                        content=text,
-                        timestamp=int(update.message.date.timestamp()),
-                    )
-                    await self._process(msg, context.bot, on_message)
+                    pass
+
+            best_photo = photos[-1]
+            caption = update.message.caption if update.message else None
+            timestamp = int(update.message.date.timestamp())
+            group_id = update.message.media_group_id if update.message else None
+
+            match group_id:
+                case None:
+                    await _process_photo(sender, best_photo, caption, timestamp, context.bot)
+                case gid:
+                    pending = self._pending_albums.get(gid)
+                    match pending:
+                        case None:
+                            async def _fire(g: str) -> None:
+                                await asyncio.sleep(ALBUM_DEBOUNCE_SECONDS)
+                                album = self._pending_albums.pop(g, None)
+                                match album:
+                                    case None:
+                                        pass
+                                    case a:
+                                        await _process_photo(
+                                            a["sender"], a["photo"],
+                                            a["caption"], a["timestamp"], a["bot"],
+                                        )
+                            task = asyncio.create_task(_fire(gid))
+                            self._pending_albums[gid] = {
+                                "sender": sender, "photo": best_photo,
+                                "caption": caption, "timestamp": timestamp,
+                                "bot": context.bot, "task": task,
+                            }
+                        case existing:
+                            existing["photo"] = best_photo
+                            match caption:
+                                case str() as c if c:
+                                    existing["caption"] = c
+                                case _:
+                                    pass
 
         return _handler
 
@@ -291,7 +353,11 @@ class TelegramClient(BotClient):
                 case None:
                     return
                 case message:
-                    await self._process(message, context.bot, on_message)
+                    match self._stream_handle:
+                        case None:
+                            await self._process(message, context.bot, on_message)
+                        case sh:
+                            await self._process_streaming(message, context.bot, sh)
 
         return _handler
 
@@ -320,3 +386,39 @@ class TelegramClient(BotClient):
                         logger.info(MSG_SEND_OK, elapsed)
                     case False:
                         logger.error(MSG_SEND_FAIL, elapsed)
+
+    async def _process_streaming(
+        self,
+        message: ChatMessage,
+        bot: Bot,
+        stream_handle: Callable,
+    ) -> None:
+        start = time.time()
+        sent = await bot.send_message(chat_id=int(message.sender), text=MSG_STREAM_PLACEHOLDER)
+        last_edit = time.time()
+        last_text = MSG_STREAM_PLACEHOLDER
+
+        async for accumulated in stream_handle(message):
+            now = time.time()
+            stripped = accumulated.strip()
+            match (stripped, now - last_edit >= STREAM_EDIT_INTERVAL):
+                case (text, True) if text and text != last_text:
+                    try:
+                        await bot.edit_message_text(
+                            chat_id=int(message.sender),
+                            message_id=sent.message_id,
+                            text=text,
+                        )
+                        last_edit = now
+                        last_text = text
+                    except Exception:
+                        pass
+                case _:
+                    pass
+
+        elapsed = time.time() - start
+        match last_text:
+            case s if s == MSG_STREAM_PLACEHOLDER:
+                logger.warning(MSG_NO_RESPONSE)
+            case _:
+                logger.info(MSG_SEND_OK, elapsed)

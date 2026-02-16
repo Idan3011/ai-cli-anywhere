@@ -2,9 +2,10 @@
 import asyncio
 import json
 import logging
+from collections.abc import AsyncGenerator
 from functools import reduce
 
-from src.chat_store import ChatStore, ClaudeSessionStore
+from src.chat_store import ChatStore, ClaudeSessionStore, MessageHistoryStore
 from src.config import Config
 from src.constants import (
     CLAUDE_MODEL_FLAG,
@@ -21,6 +22,13 @@ from src.constants import (
     MSG_ERR_NO_CURSOR,
     MSG_ERR_NO_CURSOR_RESPONSE,
     MSG_ERR_TIMEOUT,
+    CLAUDE_STREAM_FORMAT,
+    CMD_HISTORY,
+    HISTORY_MAX_ENTRIES,
+    MSG_HISTORY_BOT,
+    MSG_HISTORY_EMPTY,
+    MSG_HISTORY_HEADER,
+    MSG_HISTORY_YOU,
     MSG_MODEL_SET_CLAUDE,
     MSG_MODEL_USAGE,
     MSG_NEW_SESSION,
@@ -67,6 +75,7 @@ class MessageRouter:
         self._config = config
         self._chat_store = ChatStore()
         self._claude_store = ClaudeSessionStore()
+        self._history_store = MessageHistoryStore(max_per_sender=HISTORY_MAX_ENTRIES * 2)
         self._claude_model: str | None = None
 
     # ── model state ───────────────────────────────────────────────────────────
@@ -95,10 +104,24 @@ class MessageRouter:
         cursor = self._config.cursor_cli_path or "not configured"
         return MSG_STATUS % (model, voice, cursor)
 
+    def handle_history_command(self, sender: str) -> str:
+        entries = self._history_store.get(sender)
+        match entries:
+            case []:
+                return MSG_HISTORY_EMPTY
+            case history:
+                lines = [MSG_HISTORY_HEADER % len(history)]
+                lines += list(map(
+                    lambda e: (MSG_HISTORY_YOU if e.role == "you" else MSG_HISTORY_BOT) % e.content,
+                    history,
+                ))
+                return "\n".join(lines)
+
     def handle_new_command(self, sender: str) -> str:
         key = normalize_phone(sender)
         self._claude_store.delete(key)
         self._chat_store.delete(key)
+        self._history_store.delete(sender)
         return MSG_NEW_SESSION
 
     async def handle(self, message: ChatMessage, **_) -> str:
@@ -106,16 +129,116 @@ class MessageRouter:
             _is_claude_tagged(message.content, self._config.claude_patterns)
             or not self._config.cursor_cli_path
         )
+        self._history_store.append(message.sender, "you", message.content)
         match use_claude:
             case True:
                 logger.info(MSG_ROUTING_CLAUDE)
-                return await self._call_claude_cli(
+                response = await self._call_claude_cli(
                     message.sender,
                     _strip_claude_tag(message.content, self._config.claude_patterns),
                 )
             case False:
                 logger.info(MSG_ROUTING_CURSOR)
-                return await self._call_cursor_cli(message.sender, message.content)
+                response = await self._call_cursor_cli(message.sender, message.content)
+        self._history_store.append(message.sender, "bot", response)
+        return response
+
+    async def stream_handle(self, message: ChatMessage) -> AsyncGenerator[str, None]:
+        """Yields accumulated text chunks as Claude responds. Cursor routes fall back to one chunk."""
+        use_claude = (
+            _is_claude_tagged(message.content, self._config.claude_patterns)
+            or not self._config.cursor_cli_path
+        )
+        self._history_store.append(message.sender, "you", message.content)
+        match use_claude:
+            case True:
+                logger.info(MSG_ROUTING_CLAUDE)
+                full_text = ""
+                async for chunk in self._stream_claude_cli(
+                    message.sender,
+                    _strip_claude_tag(message.content, self._config.claude_patterns),
+                ):
+                    full_text = chunk
+                    yield chunk
+                self._history_store.append(message.sender, "bot", full_text)
+            case False:
+                logger.info(MSG_ROUTING_CURSOR)
+                response = await self._call_cursor_cli(message.sender, message.content)
+                self._history_store.append(message.sender, "bot", response)
+                yield response
+
+    async def _stream_claude_cli(self, sender: str, message: str) -> AsyncGenerator[str, None]:
+        key = normalize_phone(sender)
+        session_id = self._claude_store.get(key)
+        claude = self._config.claude_cli_path
+
+        base_args = (
+            [claude, CLAUDE_PROMPT_FLAG, message, CLAUDE_RESUME_FLAG, session_id]
+            if session_id
+            else [claude, CLAUDE_PROMPT_FLAG, message, CLAUDE_OUTPUT_FLAG, CLAUDE_STREAM_FORMAT]
+        )
+        args = base_args + match_model_args(self._claude_model)
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            accumulated = ""
+            async for raw_line in process.stdout:
+                line = raw_line.decode(errors="replace").strip()
+                match line:
+                    case "":
+                        continue
+                    case _:
+                        pass
+                try:
+                    event = json.loads(line)
+                    match event.get("type"):
+                        case "assistant":
+                            content = event.get("message", {}).get("content", [])
+                            text = "".join(
+                                b.get("text", "") for b in content if b.get("type") == "text"
+                            )
+                            match text.strip():
+                                case "":
+                                    pass
+                                case t:
+                                    accumulated += t
+                                    yield accumulated
+                        case "result":
+                            new_id = event.get("session_id")
+                            match new_id:
+                                case str() as s if s:
+                                    self._claude_store.set(key, s)
+                                case _:
+                                    pass
+                            final = event.get("result", "").strip()
+                            match final:
+                                case "" | None:
+                                    pass
+                                case r if r != accumulated.strip():
+                                    yield r
+                        case _:
+                            pass
+                except (json.JSONDecodeError, TypeError):
+                    accumulated += line + "\n"
+                    yield accumulated.strip()
+
+            await process.wait()
+            match (process.returncode, accumulated):
+                case (0, _):
+                    pass
+                case (_, _):
+                    err = (await process.stderr.read()).decode()[:100]
+                    yield f"Error calling Claude: {err}"
+
+        except asyncio.TimeoutError:
+            yield MSG_ERR_TIMEOUT
+        except Exception as exc:
+            logger.error("Error streaming Claude: %s", exc)
+            yield f"Error: {exc}"
 
     async def _call_claude_cli(self, sender: str, message: str) -> str:
         try:

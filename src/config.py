@@ -20,6 +20,7 @@ class Config:
     cursor_working_dir: Optional[str]
     openai_api_key: Optional[str]
     anthropic_api_key: Optional[str]
+    stream_responses: bool
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -37,6 +38,7 @@ class Config:
         cursor_working_dir = os.getenv("CURSOR_WORKING_DIR") or None
         openai_api_key = os.getenv("OPENAI_API_KEY") or None
         anthropic_api_key = os.getenv("ANTHROPIC_API_KEY") or None
+        stream_responses = os.getenv("STREAM_RESPONSES", "false").lower() == "true"
 
         patterns = tuple(p.strip() for p in raw_patterns.split(",") if p.strip())
         aliases = dict(
@@ -58,6 +60,7 @@ class Config:
             cursor_working_dir=cursor_working_dir,
             openai_api_key=openai_api_key,
             anthropic_api_key=anthropic_api_key,
+            stream_responses=stream_responses,
         )
 
     @staticmethod
@@ -74,6 +77,7 @@ class Config:
         cursor_working_dir: Optional[str],
         openai_api_key: Optional[str],
         anthropic_api_key: Optional[str],
+        stream_responses: bool,
     ) -> "Config":
         match telegram_bot_token:
             case None | "":
@@ -100,4 +104,5 @@ class Config:
             cursor_working_dir=cursor_working_dir,
             openai_api_key=openai_api_key,
             anthropic_api_key=anthropic_api_key,
+            stream_responses=stream_responses,
         )

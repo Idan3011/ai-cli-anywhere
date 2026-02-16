@@ -51,6 +51,7 @@ def test_config_immutable():
         cursor_working_dir=None,
         openai_api_key=None,
         anthropic_api_key=None,
+        stream_responses=False,
     )
 
     with pytest.raises(Exception):

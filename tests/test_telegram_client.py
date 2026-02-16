@@ -20,6 +20,7 @@ def make_config(*, token: str = "test-token", chat_id: str = "123456789") -> Con
         cursor_working_dir=None,
         openai_api_key=None,
         anthropic_api_key=None,
+        stream_responses=False,
     )
 
 

@@ -279,3 +279,39 @@ def test_new_on_empty_session_still_returns_confirmation(monkeypatch):
     router = MessageRouter(make_config(monkeypatch))
     result = router.handle_new_command("123456789")
     assert result == MSG_NEW_SESSION
+
+
+# ── /history command ──────────────────────────────────────────────────────────
+
+
+def test_history_empty_when_no_messages(monkeypatch):
+    from src.constants import MSG_HISTORY_EMPTY
+    router = MessageRouter(make_config(monkeypatch))
+    assert router.handle_history_command("123456789") == MSG_HISTORY_EMPTY
+
+
+def test_history_shows_exchanges_after_messages(monkeypatch):
+    router = MessageRouter(make_config(monkeypatch))
+    router._history_store.append("123456789", "you", "hello")
+    router._history_store.append("123456789", "bot", "hi there")
+    result = router.handle_history_command("123456789")
+    assert "hello" in result
+    assert "hi there" in result
+
+
+def test_new_also_clears_history(monkeypatch):
+    from src.constants import MSG_HISTORY_EMPTY
+    router = MessageRouter(make_config(monkeypatch))
+    router._history_store.append("123456789", "you", "hello")
+    router.handle_new_command("123456789")
+    assert router.handle_history_command("123456789") == MSG_HISTORY_EMPTY
+
+
+@pytest.mark.asyncio
+async def test_handle_records_exchange_in_history(monkeypatch):
+    router = MessageRouter(make_config(monkeypatch))
+    with patch.object(router, "_call_claude_cli", new=AsyncMock(return_value="reply")):
+        await router.handle(make_message("@claude hello"))
+    entries = router._history_store.get("123456789")
+    assert any(e.role == "you" for e in entries)
+    assert any(e.role == "bot" for e in entries)

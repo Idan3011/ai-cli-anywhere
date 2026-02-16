@@ -42,6 +42,12 @@ MSG_VOICE_NOT_CONFIGURED = "Voice messages are not supported in this setup."
 
 # Image analysis
 CLAUDE_VISION_MODEL = "claude-opus-4-6"
+ALBUM_DEBOUNCE_SECONDS: float = 0.5
+
+# Streaming responses
+CLAUDE_STREAM_FORMAT = "stream-json"
+STREAM_EDIT_INTERVAL: float = 1.0
+MSG_STREAM_PLACEHOLDER = "..."
 MSG_IMAGE_DEFAULT_PROMPT = "What do you see in this image? Describe it in detail."
 MSG_IMAGE_ANALYSIS_FAILED = "Could not analyze image — please try again."
 MSG_IMAGE_NOT_CONFIGURED = "Image analysis is not supported in this setup."
@@ -75,6 +81,13 @@ MSG_STATUS = (
 CMD_NEW = "new"
 MSG_NEW_SESSION = "Session cleared — starting fresh."
 
+CMD_HISTORY = "history"
+HISTORY_MAX_ENTRIES = 10
+MSG_HISTORY_EMPTY = "No history yet — send a message first."
+MSG_HISTORY_HEADER = "Last %d exchanges:\n\n"
+MSG_HISTORY_YOU = "You: %s"
+MSG_HISTORY_BOT = "Bot: %s"
+
 MSG_HELP = (
     "ai-cli-anywhere — your dev tools on Telegram\n"
     "\n"
@@ -84,9 +97,12 @@ MSG_HELP = (
     "  /model claude <alias>    — switch Claude model\n"
     "  /model cursor <name>     — switch Cursor model\n"
     "  /new                     — start a fresh Claude session\n"
+    "  /history                 — show last exchanges\n"
     "\n"
-    "Voice:\n"
-    "  Send a voice note        — transcribed and routed automatically\n"
+    "Media:\n"
+    "  Voice note               — transcribed then routed automatically\n"
+    "  Photo                    — analyzed by Claude Vision then routed\n"
+    "  Photo + caption          — caption becomes the analysis question\n"
     "\n"
     "Model aliases (update in .env):\n"
     "  opus   → claude-opus-4-6\n"
