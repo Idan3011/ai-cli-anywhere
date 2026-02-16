@@ -9,13 +9,16 @@ Built this for myself — tired of being away from my desk and not being able to
 ## How it works
 
 ```
-Your Telegram message (text or voice)
+Your Telegram message
         ↓
 Telegram Bot API  (official, event-driven)
         ↓
-  voice note?  → transcribed to text automatically
+  voice note?  → transcribed via Whisper → text
+  photo?       → analyzed via Claude Vision → text
   @claude tag? → Claude CLI (your installation, your projects)
-  /model ...   → switch AI model
+  /model ...   → switch AI model on the fly
+  /status      → see current config
+  /new         → fresh session
   everything else → Cursor Agent
         ↓
 Reply back to Telegram
