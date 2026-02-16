@@ -42,6 +42,7 @@ MSG_VOICE_NOT_CONFIGURED = "Voice messages are not supported in this setup."
 
 # Image analysis
 CLAUDE_VISION_MODEL = "claude-opus-4-6"
+OPENAI_VISION_MODEL = "gpt-4o"
 ALBUM_DEBOUNCE_SECONDS: float = 0.5
 
 # Streaming responses

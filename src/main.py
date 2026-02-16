@@ -9,6 +9,7 @@ from src.router import MessageRouter
 from src.telegram.client import TelegramClient
 from src.transcription.whisper import WhisperTranscriptionClient
 from src.vision.claude import ClaudeVisionClient
+from src.vision.openai import OpenAIVisionClient
 
 
 def _setup_logging(level: str) -> None:
@@ -31,11 +32,13 @@ def main() -> None:
         if config.openai_api_key
         else None
     )
-    vision = (
-        ClaudeVisionClient(config.anthropic_api_key)
-        if config.anthropic_api_key
-        else None
-    )
+    match (config.anthropic_api_key, config.openai_api_key):
+        case (str() as k, _) if k:
+            vision = ClaudeVisionClient(k)
+        case (_, str() as k) if k:
+            vision = OpenAIVisionClient(k)
+        case _:
+            vision = None
     client = TelegramClient(config, transcriber=transcriber, vision_client=vision)
     client.run(
         router.handle,
