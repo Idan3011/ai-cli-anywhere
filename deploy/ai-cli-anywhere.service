@@ -1,0 +1,18 @@
+[Unit]
+Description=ai-cli-anywhere Telegram bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/home/%i/ai-cli-anywhere
+ExecStart=/home/%i/ai-cli-anywhere/.venv/bin/python -m src.main
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONPATH=/home/%i/ai-cli-anywhere
+
+[Install]
+WantedBy=multi-user.target

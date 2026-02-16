@@ -1,0 +1,14 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - .:/app
+      - claude_auth:/root/.claude
+      - cursor_auth:/root/.cursor
+    working_dir: /app
+
+volumes:
+  claude_auth:
+  cursor_auth:
