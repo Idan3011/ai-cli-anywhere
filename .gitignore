@@ -24,6 +24,7 @@ src/whatsapp
 .cursor_chat_ids.json
 .claude_session_ids.json
 .processed_messages.json
+.message_history.json
 
 # Logs
 *.log
