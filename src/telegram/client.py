@@ -1,9 +1,10 @@
 """TelegramClient — event-driven transport via python-telegram-bot."""
+import asyncio
 import logging
 import time
 from typing import Awaitable, Callable, Optional
 
-from telegram import Bot, Update
+from telegram import Bot, PhotoSize, Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 from telegram.ext import MessageHandler as TGMessageHandler
 from telegram.ext import filters
@@ -200,29 +201,31 @@ class TelegramClient(BotClient):
                     return
                 case _:
                     pass
-            voice = update.message.voice if update.message else None
-            match voice:
-                case None:
-                    return
-                case v:
-                    typing = TelegramTypingIndicator(context.bot, sender)
-                    await typing.start(sender)
-                    try:
-                        tg_file = await v.get_file()
-                        audio_bytes = bytes(await tg_file.download_as_bytearray())
-                        text = await self._transcriber.transcribe(audio_bytes)
-                    except Exception:
-                        await typing.stop(sender)
-                        logger.exception("Voice transcription failed")
-                        await self.send_message(sender, MSG_VOICE_TRANSCRIPTION_FAILED)
-                        return
-                    await typing.stop(sender)
-                    msg = ChatMessage(
-                        sender=sender,
-                        content=text,
-                        timestamp=int(update.message.date.timestamp()),
-                    )
-                    await self._process(msg, context.bot, on_message)
+            if not update.message:
+                return
+            
+            voice = update.message.voice
+            if not voice:
+                return
+            
+            typing = TelegramTypingIndicator(context.bot, sender)
+            await typing.start(sender)
+            try:
+                tg_file = await voice.get_file()
+                audio_bytes = bytes(await tg_file.download_as_bytearray())
+                text = await self._transcriber.transcribe(audio_bytes)
+            except Exception:
+                await typing.stop(sender)
+                logger.exception("Voice transcription failed")
+                await self.send_message(sender, MSG_VOICE_TRANSCRIPTION_FAILED)
+                return
+            await typing.stop(sender)
+            msg = ChatMessage(
+                sender=sender,
+                content=text,
+                timestamp=int(update.message.date.timestamp()),
+            )
+            await self._process(msg, context.bot, on_message)
 
         return _handler
 
@@ -231,11 +234,14 @@ class TelegramClient(BotClient):
     ) -> Callable:
         async def _process_photo(
             sender: str,
-            best_photo: object,
+            best_photo: PhotoSize,
             caption: Optional[str],
             timestamp: int,
             bot: Bot,
         ) -> None:
+            if not self._vision_client:
+                return
+            
             typing = TelegramTypingIndicator(bot, sender)
             await typing.start(sender)
             try:
@@ -268,17 +274,17 @@ class TelegramClient(BotClient):
                 case _:
                     pass
 
-            photos = update.message.photo if update.message else None
-            match photos:
-                case None | []:
-                    return
-                case _:
-                    pass
+            if not update.message:
+                return
+            
+            photos = update.message.photo
+            if not photos:
+                return
 
             best_photo = photos[-1]
-            caption = update.message.caption if update.message else None
+            caption = update.message.caption
             timestamp = int(update.message.date.timestamp())
-            group_id = update.message.media_group_id if update.message else None
+            group_id = update.message.media_group_id
 
             match group_id:
                 case None:

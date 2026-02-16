@@ -185,6 +185,10 @@ class MessageRouter:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
+            if not process.stdout:
+                yield "Error: No stdout from Claude process"
+                return
+            
             accumulated = ""
             async for raw_line in process.stdout:
                 line = raw_line.decode(errors="replace").strip()
@@ -231,8 +235,11 @@ class MessageRouter:
                 case (0, _):
                     pass
                 case (_, _):
-                    err = (await process.stderr.read()).decode()[:100]
-                    yield f"Error calling Claude: {err}"
+                    if process.stderr:
+                        err = (await process.stderr.read()).decode()[:100]
+                        yield f"Error calling Claude: {err}"
+                    else:
+                        yield "Error calling Claude"
 
         except asyncio.TimeoutError:
             yield MSG_ERR_TIMEOUT

@@ -36,4 +36,8 @@ class ClaudeVisionClient(VisionClient):
                 }
             ],
         )
-        return message.content[0].text.strip()
+        match getattr(message.content[0], "text", None):
+            case str() as t:
+                return t.strip()
+            case _:
+                return ""
